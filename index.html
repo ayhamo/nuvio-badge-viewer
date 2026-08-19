@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gist Filter Badges Viewer</title>
+  <style>
+    :root {
+      --bg: #0e0e11;
+      --card-bg: #18181f;
+      --section-bg: #131317;
+      --text: #ffffff;
+      --text-muted: #8d8d99;
+      --accent: #9d65ff;
+      --border: #26262e;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2.5rem;
+    }
+    header {
+      margin-bottom: 2rem;
+    }
+    h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.6rem;
+    }
+    .status {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .gist-block {
+      background: var(--section-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+    .gist-header {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+    .gist-header a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .gist-header a:hover {
+      text-decoration: underline;
+    }
+    .group-section {
+      margin-bottom: 1.5rem;
+    }
+    .group-section:last-child {
+      margin-bottom: 0;
+    }
+    .group-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .group-count {
+      font-size: 0.75rem;
+      background: var(--border);
+      color: var(--text-muted);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .gif-item {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card-bg);
+      padding: 8px 16px;
+      border-radius: 8px;
+      min-height: 40px;
+    }
+    .gif-item img {
+      height: 38px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .text-fallback {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #dedede;
+      letter-spacing: 0.5px;
+    }
+    .error-msg {
+      color: #ff5c5c;
+      padding: 1rem;
+      background: rgba(255, 92, 92, 0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 92, 92, 0.2);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Filter Badges Viewer</h1>
+    <div id="status" class="status">Loading gists from @darpit33...</div>
+  </header>
+
+  <div id="container"></div>
+
+  <script>
+    const USERNAME = "darpit33";
+    const statusEl = document.getElementById("status");
+    const containerEl = document.getElementById("container");
+
+    async function loadAllGists() {
+      try {
+        const res = await fetch(`https://api.github.com/users/${USERNAME}/gists`);
+        if (!res.ok) throw new Error(`GitHub API returned status ${res.status}`);
+        const gists = await res.json();
+
+        let jsonFilesFound = 0;
+        containerEl.innerHTML = "";
+
+        for (const gist of gists) {
+          for (const filename of Object.keys(gist.files)) {
+            const file = gist.files[filename];
+            
+            // Only process valid .json files
+            if (filename.toLowerCase().endsWith(".json")) {
+              jsonFilesFound++;
+              await fetchAndRenderJson(filename, file.raw_url, gist.html_url);
+            }
+          }
+        }
+
+        if (jsonFilesFound === 0) {
+          statusEl.textContent = `No .json files found in public gists for @${USERNAME}.`;
+        } else {
+          statusEl.textContent = `Loaded ${jsonFilesFound} JSON files from @${USERNAME}.`;
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<div class="error-msg">Failed to load gists: ${err.message}</div>`;
+      }
+    }
+
+    async function fetchAndRenderJson(filename, rawUrl, gistUrl) {
+      try {
+        const res = await fetch(rawUrl);
+        const data = await res.json();
+
+        if (!data.groups || !data.filters) return;
+
+        // Group filters by groupId
+        const groupedFilters = {};
+        data.groups.forEach(g => { groupedFilters[g.id] = []; });
+
+        data.filters.forEach(filter => {
+          if (groupedFilters[filter.groupId]) {
+            groupedFilters[filter.groupId].push(filter);
+          }
+        });
+
+        // Construct block for each JSON file
+        const block = document.createElement("div");
+        block.className = "gist-block";
+
+        let groupsHtml = "";
+        data.groups.forEach(group => {
+          const filters = groupedFilters[group.id] || [];
+          if (filters.length === 0) return;
+
+          groupsHtml += `
+            <div class="group-section">
+              <div class="group-title">
+                <span>${group.name}</span>
+                <span class="group-count">${filters.length}</span>
+              </div>
+              <div class="badge-row">
+                ${filters.map(f => `
+                  <div class="gif-item">
+                    ${f.imageURL 
+                      ? `<img src="${f.imageURL}" alt="${f.name}" title="${f.name}" onerror="this.outerHTML='<span class=\\'text-fallback\\'>${f.name}</span>'" />` 
+                      : `<span class="text-fallback">${f.name}</span>`
+                    }
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          `;
+        });
+
+        block.innerHTML = `
+          <div class="gist-header">
+            <span>${filename}</span>
+            <a href="${gistUrl}" target="_blank" rel="noopener noreferrer">View Gist ↗</a>
+          </div>
+          ${groupsHtml}
+        `;
+
+        containerEl.appendChild(block);
+      } catch (err) {
+        console.warn(`Could not parse ${filename}:`, err);
+      }
+    }
+
+    loadAllGists();
+  </script>
+</body>
+</html>
