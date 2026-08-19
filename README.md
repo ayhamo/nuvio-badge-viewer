@@ -1,6 +1,8 @@
 # Nuvio Badge Viewer & Scraper
 -- This is a AI-generated Text --
 
+Note: You can use the link: https://ayhamo.github.io/nuvio-badge-viewer/ or github pages link to view all badges, and pick the json then by name and saved in Nuvio settings
+
 A lightweight viewer and backup utility for Nuvio media animated badge presets hosted on GitHub Gists from https://gist.github.com/darpit33.
 
 He created a cool animated badges but links are getting deleted, so this was made as a backup for me, and others to benefit from
